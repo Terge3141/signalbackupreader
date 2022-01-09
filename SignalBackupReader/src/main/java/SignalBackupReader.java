@@ -7,12 +7,19 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.Mac;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 import org.thoughtcrime.securesms.backup.*;
@@ -30,25 +37,79 @@ public class SignalBackupReader {
 	private final int PASSPHRASE_LENGH = 30;
 	private final String HKDF_INFO = "Backup Export";
 	private String passphrase;
+	private byte hmacKeys[];
+	private byte cypherKey[];
+	private long counter;
+	private byte[] ivBytes;
 	
-	public SignalBackupReader(Path backupPath, Path passphrasePath) throws IOException, SignalBackupReaderException {
+	public SignalBackupReader(Path backupPath, Path passphrasePath) throws IOException, SignalBackupReaderException, NoSuchAlgorithmException, InvalidKeyException, NoSuchPaddingException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException {
 		this.in = new BufferedInputStream(new FileInputStream(backupPath.toFile()));
 		this.passphrase = readPassphrase(passphrasePath);
 		
 		System.out.println("Passphrase:*" + this.passphrase + "*");
+		readKeys();
+		readBackupFrame();
+		readBackupFrame();
 	}
 	
+	private void readBackupFrame() throws IOException, SignalBackupReaderException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException {
+		byte[] data = nextBlock();
+		byte[] encrypted = Arrays.copyOf(data, data.length-10);
+		byte[] theirMac = Arrays.copyOfRange(data, data.length - 10, data.length);
+		
+		//dumpByteArray("IV", ivBytes);
+		//byte ivBytes[] = bytesFromUint(counter);
+		dumpByteArray("IV", this.ivBytes);
+		
+		dumpByteArray("encrypted", encrypted);
+		
+		byte[] myMac = HKDF.fromHmacSha256().extract(hmacKeys, encrypted);
+		myMac = Arrays.copyOf(myMac, theirMac.length);
+		//dumpByteArray("theirmac", theirMac);
+		//dumpByteArray("mymac", myMac);
+		
+		if(!Arrays.equals(myMac, theirMac)) {
+			throw new SignalBackupReaderException("mymac and theirmac differ");
+		}
+		
+		//SecretKeySpec secretKeySpec = new SecretKeySpec(cypherKey, "AES");
+		SecretKey secretKey = new SecretKeySpec(cypherKey, 0, cypherKey.length, "AES");
+		IvParameterSpec ivSpec = new IvParameterSpec(ivBytes);
+		Cipher cipher = Cipher.getInstance("AES/CTR/NoPadding");
+		cipher.init(Cipher.ENCRYPT_MODE, secretKey, ivSpec);
+		
+		//cipher.update(encrypted);
+		byte[] decrypted = cipher.doFinal(encrypted);
+		incCounter();
+		
+		dumpByteArray("decrypted", decrypted);
+		
+		BackupFrame backupFrame = BackupFrame.parseFrom(decrypted);
+		System.out.println(backupFrame.getVersion());
+	}
 	
-	// http://jhnet.co.uk/articles/signal_backups
-	public void nextFrame() throws IOException, NoSuchAlgorithmException {
+	private byte[] nextBlock() throws IOException {
 		byte buf[] = new byte[HEADER_SIZE];
 		in.read(buf);
 		int headerSize = getInt(buf);
 		System.out.println(headerSize);
-		//dumpByteArray(buf);
 		
 		byte data[] = new byte[headerSize]; 
 		in.read(data);
+
+		return data;
+	}
+	
+	
+	// http://jhnet.co.uk/articles/signal_backups
+	private void readKeys() throws IOException, NoSuchAlgorithmException {
+		/*byte buf[] = new byte[HEADER_SIZE];
+		in.read(buf);
+		int headerSize = getInt(buf);
+		System.out.println(headerSize);*/
+		//dumpByteArray(buf);
+		
+		byte data[] = nextBlock();
 		
 		BackupFrame backupFrame = BackupFrame.parseFrom(data);
 		Header header = backupFrame.getHeader();
@@ -58,9 +119,12 @@ public class SignalBackupReader {
 		byte salt[] = saltByteString.toByteArray();
 		byte passphraseBytes[] = this.passphrase.getBytes(StandardCharsets.US_ASCII);
 		byte hash[] = passphraseBytes;
+		this.ivBytes = ivByteString.toByteArray();
+		counter = getUintFromBytes(Arrays.copyOfRange(ivBytes, 0, 4)); 
 		
 		dumpByteArray("Salt", salt);
-		dumpByteArray("Hash1", hash);
+		dumpByteArray("Hash", hash);
+		System.out.println("Counter: " + counter);
 		
 		MessageDigest sha512 = MessageDigest.getInstance("SHA-512");
 		sha512.update(salt);
@@ -78,16 +142,45 @@ public class SignalBackupReader {
 		
 		byte info[] = HKDF_INFO.getBytes(StandardCharsets.US_ASCII);
 		byte keys[] = HKDF.fromHmacSha256().expand(res, info, 64);
-		byte cypher_key[] = Arrays.copyOf(keys, 32);
-		byte hmac_key[] = Arrays.copyOfRange(keys, 32, 64);
+		this.cypherKey = Arrays.copyOf(keys, 32);
+		this.hmacKeys = Arrays.copyOfRange(keys, 32, 64);
 		
-		dumpByteArray("Cipherkey: ", cypher_key);
-		dumpByteArray("Mackey", hmac_key);
+		dumpByteArray("Cipherkey: ", cypherKey);
+		dumpByteArray("Mackey", hmacKeys);
+	}
+	
+	private void incCounter() {
+		counter++;
+		counter = counter & 0xFFFFFFFF;
+		byte[] counterBytes = bytesFromUint(counter);
+		for(int i=0; i<counterBytes.length; i++) {
+			this.ivBytes[i] = counterBytes[i];
+		}
 	}
 	
 	private int getInt(byte[] arr) {
 		ByteBuffer bb = ByteBuffer.wrap(arr);
 		return bb.getInt();
+	}
+	
+	private long getUintFromBytes(byte[] arr) {
+		byte buf[] = arr;
+		if(arr.length<8) {
+			buf = new byte[8];
+			for(int i=8-arr.length; i<8; i++) {
+				buf[i] = arr[i - 8 + arr.length];
+			}
+		}
+		
+		ByteBuffer bb = ByteBuffer.wrap(buf);
+		return bb.getLong();
+	}
+	
+	private byte[] bytesFromUint(long x) {
+	    ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
+	    buffer.putLong(x);
+	    byte arr[] = buffer.array();
+	    return Arrays.copyOfRange(arr, arr.length-4, arr.length);
 	}
 	
 	private String readPassphrase(Path passphrasePath) throws IOException, SignalBackupReaderException {

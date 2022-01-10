@@ -51,13 +51,19 @@ public class SignalBackupReader {
 		System.out.println("Passphrase:*" + this.passphrase + "*");
 		readKeys();
 		
-		for(int i=0; i<100; i++) {
-			readBackupFrame();
+		while(readBackupFrame()) {
+			
 		}
+		/*for(int i=0; i<100; i++) {
+			readBackupFrame();
+		}*/
 	}
 	
-	private void readBackupFrame() throws IOException, SignalBackupReaderException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException {
+	private boolean readBackupFrame() throws IOException, SignalBackupReaderException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException {
 		byte[] data = nextBlock();
+		if(data==null) {
+			return false;
+		}
 		/*byte[] encrypted = Arrays.copyOf(data, data.length-10);
 		byte[] theirMac = Arrays.copyOfRange(data, data.length - 10, data.length);
 		
@@ -112,12 +118,16 @@ public class SignalBackupReader {
 			byte encBlob[] = new byte[length+10];
 			in.read(encBlob);
 			byte decBlob[] = decrypt(encBlob, false);
+			
+			
 		}
 		
 		/*if(backupFrame.hasStatement()) {
 			System.out.println(backupFrame.getStatement().getStatement());
 		}*/
 		//Map<FieldDescriptor, Object>
+		
+		return true;
 	}
 	
 	private byte[] decrypt(byte[] data, boolean frameMacCheck) throws InvalidKeyException, InvalidAlgorithmParameterException, SignalBackupReaderException, NoSuchAlgorithmException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException {

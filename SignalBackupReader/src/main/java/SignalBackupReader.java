@@ -12,6 +12,7 @@ import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
+import java.util.Set;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -27,6 +28,7 @@ import org.thoughtcrime.securesms.backup.BackupProtos.BackupFrame;
 import org.thoughtcrime.securesms.backup.BackupProtos.Header;
 
 import com.google.protobuf.ByteString;
+import com.google.protobuf.Descriptors.FieldDescriptor;
 
 import at.favre.lib.crypto.HKDF;
 
@@ -48,20 +50,20 @@ public class SignalBackupReader {
 		
 		System.out.println("Passphrase:*" + this.passphrase + "*");
 		readKeys();
-		readBackupFrame();
-		readBackupFrame();
+		
+		for(int i=0; i<100; i++) {
+			readBackupFrame();
+		}
 	}
 	
 	private void readBackupFrame() throws IOException, SignalBackupReaderException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException {
 		byte[] data = nextBlock();
-		byte[] encrypted = Arrays.copyOf(data, data.length-10);
+		/*byte[] encrypted = Arrays.copyOf(data, data.length-10);
 		byte[] theirMac = Arrays.copyOfRange(data, data.length - 10, data.length);
 		
 		//dumpByteArray("IV", ivBytes);
-		//byte ivBytes[] = bytesFromUint(counter);
-		dumpByteArray("IV", this.ivBytes);
-		
-		dumpByteArray("encrypted", encrypted);
+		//dumpByteArray("IV", this.ivBytes);
+		//dumpByteArray("encrypted", encrypted);
 		
 		byte[] myMac = HKDF.fromHmacSha256().extract(hmacKeys, encrypted);
 		myMac = Arrays.copyOf(myMac, theirMac.length);
@@ -80,20 +82,104 @@ public class SignalBackupReader {
 		
 		//cipher.update(encrypted);
 		byte[] decrypted = cipher.doFinal(encrypted);
+		incCounter();*/
+		
+		//dumpByteArray("decrypted", decrypted);
+		
+		byte decrypted[] = decrypt(data, true);
+		BackupFrame backupFrame = BackupFrame.parseFrom(decrypted);
+		//System.out.println(backupFrame.getVersion());
+		Set<FieldDescriptor> fds = backupFrame.getAllFields().keySet();
+		for(FieldDescriptor fd : fds) {
+			System.out.println("fd: " + fds.size() + " " + fd.getFullName());
+		}
+		
+		if(backupFrame.hasAttachment() || backupFrame.hasSticker() || backupFrame.hasAvatar()) {
+			int length;
+			if(backupFrame.hasAttachment()) {
+				length = backupFrame.getAttachment().getLength();
+			}
+			else if(backupFrame.hasSticker()) {
+				length = backupFrame.getSticker().getLength();
+			}
+			else if(backupFrame.hasAvatar()) {
+				length = backupFrame.getAvatar().getLength();
+			}
+			else {
+				throw new SignalBackupReaderException("Internal error");
+			}
+			
+			byte encBlob[] = new byte[length+10];
+			in.read(encBlob);
+			byte decBlob[] = decrypt(encBlob, false);
+		}
+		
+		/*if(backupFrame.hasStatement()) {
+			System.out.println(backupFrame.getStatement().getStatement());
+		}*/
+		//Map<FieldDescriptor, Object>
+	}
+	
+	private byte[] decrypt(byte[] data, boolean frameMacCheck) throws InvalidKeyException, InvalidAlgorithmParameterException, SignalBackupReaderException, NoSuchAlgorithmException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException {
+		byte[] encrypted = Arrays.copyOf(data, data.length-10);
+		byte[] theirMac = Arrays.copyOfRange(data, data.length - 10, data.length);
+		
+		//dumpByteArray("IV", this.ivBytes);
+		//dumpByteArray("encrypted", encrypted);
+		
+		byte[] myMac;
+		if(frameMacCheck) {
+			myMac = HKDF.fromHmacSha256().extract(hmacKeys, encrypted);
+		}
+		else {
+			/*HKDF hkdf = HKDF.fromHmacSha256();
+			
+			hkdf.extract(hmacKeys, ivBytes);
+			myMac = hkdf.extract(hmacKeys, encrypted);*/
+			byte buf[] = Arrays.copyOf(ivBytes, ivBytes.length + encrypted.length);
+		    System.arraycopy(encrypted, 0, buf, ivBytes.length, encrypted.length);
+		    myMac = HKDF.fromHmacSha256().extract(hmacKeys, buf);
+		}
+		
+		myMac = Arrays.copyOf(myMac, theirMac.length);
+		
+		if(!Arrays.equals(myMac, theirMac)) {
+			dumpByteArray("theirmac", theirMac);
+			dumpByteArray("mymac", myMac);
+			throw new SignalBackupReaderException("mymac and theirmac differ");
+		}
+		
+		//SecretKeySpec secretKeySpec = new SecretKeySpec(cypherKey, "AES");
+		SecretKey secretKey = new SecretKeySpec(cypherKey, 0, cypherKey.length, "AES");
+		IvParameterSpec ivSpec = new IvParameterSpec(ivBytes);
+		Cipher cipher = Cipher.getInstance("AES/CTR/NoPadding");
+		cipher.init(Cipher.ENCRYPT_MODE, secretKey, ivSpec);
+		
+		//cipher.update(encrypted);
+		byte[] decrypted = cipher.doFinal(encrypted);
 		incCounter();
 		
-		dumpByteArray("decrypted", decrypted);
-		
-		BackupFrame backupFrame = BackupFrame.parseFrom(decrypted);
-		System.out.println(backupFrame.getVersion());
+		return decrypted;
 	}
 	
 	private byte[] nextBlock() throws IOException {
+		if(in.available()< HEADER_SIZE) {
+			return null;
+		}
+		
 		byte buf[] = new byte[HEADER_SIZE];
 		in.read(buf);
+		dumpByteArray("headersize bytes", buf);
 		int headerSize = getInt(buf);
-		System.out.println(headerSize);
-		
+		//System.out.println(headerSize);
+		long tmp = getUintFromBytes(buf);
+		System.out.println(tmp);
+		if(tmp>10000) {
+			byte[] buf2 = new byte[10];
+			in.read(buf2);
+			dumpByteArray("buf", buf2);
+			throw new IOException();
+		}
 		byte data[] = new byte[headerSize]; 
 		in.read(data);
 

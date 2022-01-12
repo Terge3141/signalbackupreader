@@ -11,7 +11,10 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.sql.Connection;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 
 import javax.crypto.BadPaddingException;
@@ -24,8 +27,14 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 import org.thoughtcrime.securesms.backup.*;
+import org.thoughtcrime.securesms.backup.BackupProtos.Attachment;
+import org.thoughtcrime.securesms.backup.BackupProtos.Avatar;
 import org.thoughtcrime.securesms.backup.BackupProtos.BackupFrame;
 import org.thoughtcrime.securesms.backup.BackupProtos.Header;
+import org.thoughtcrime.securesms.backup.BackupProtos.KeyValue;
+import org.thoughtcrime.securesms.backup.BackupProtos.SharedPreference;
+import org.thoughtcrime.securesms.backup.BackupProtos.SqlStatement;
+import org.thoughtcrime.securesms.backup.BackupProtos.Sticker;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Descriptors.FieldDescriptor;
@@ -51,18 +60,18 @@ public class SignalBackupReader {
 		System.out.println("Passphrase:*" + this.passphrase + "*");
 		readKeys();
 		
-		while(readBackupFrame()) {
+		/*while(readBackupFrame()!=null) {
 			
-		}
+		}*/
 		/*for(int i=0; i<100; i++) {
 			readBackupFrame();
 		}*/
 	}
 	
-	private boolean readBackupFrame() throws IOException, SignalBackupReaderException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException {
+	public IEntry readBackupFrame() throws IOException, SignalBackupReaderException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException {
 		byte[] data = nextBlock();
 		if(data==null) {
-			return false;
+			return null;
 		}
 		/*byte[] encrypted = Arrays.copyOf(data, data.length-10);
 		byte[] theirMac = Arrays.copyOfRange(data, data.length - 10, data.length);
@@ -93,23 +102,71 @@ public class SignalBackupReader {
 		//dumpByteArray("decrypted", decrypted);
 		
 		byte decrypted[] = decrypt(data, true);
-		BackupFrame backupFrame = BackupFrame.parseFrom(decrypted);
+		BackupFrame frame = BackupFrame.parseFrom(decrypted);
 		//System.out.println(backupFrame.getVersion());
-		Set<FieldDescriptor> fds = backupFrame.getAllFields().keySet();
+		/*Set<FieldDescriptor> fds = frame.getAllFields().keySet();
 		for(FieldDescriptor fd : fds) {
 			System.out.println("fd: " + fds.size() + " " + fd.getFullName());
-		}
+		}*/
 		
-		if(backupFrame.hasAttachment() || backupFrame.hasSticker() || backupFrame.hasAvatar()) {
+		if(frame.hasHeader()) {
+			throw new SignalBackupReaderException("Header already parse. File corrupt?");
+		}
+		else if(frame.hasStatement()) {
+			SqlStatement stmt = frame.getStatement();
+			System.out.println("Statement: " + stmt.getStatement());
+					
+			// "sms_fts"
+			// "mms_fts"
+			// "emoji_search"
+			// getStatement().toLowerCase().startsWith("create table sqlite_");
+			// Ignore the following statements
+			String stmtStr = stmt.getStatement();
+			if(stmtStr.contains("sms_fts") || stmtStr.contains("mms_fts") ||
+					stmtStr.contains("emoji_search") ||
+					stmtStr.toLowerCase().startsWith("create table sqlite_")) {
+				return readBackupFrame();
+			}
+
+			
+			List<Object> parameters = new ArrayList<Object>();
+			for (SqlStatement.SqlParameter parameter : stmt.getParametersList()) {
+				if (parameter.hasStringParamter()) {
+					parameters.add(parameter.getStringParamter());
+				} else if (parameter.hasDoubleParameter()) {
+					parameters.add(parameter.getDoubleParameter());
+				} else if (parameter.hasIntegerParameter()) {
+					parameters.add(parameter.getIntegerParameter());
+				} else if (parameter.hasBlobParameter()) {
+					parameters.add(parameter.getBlobParameter().toByteArray());
+				} else if (parameter.hasNullparameter()) {
+					parameters.add(null);
+				}
+			}
+			
+			return new SqlStatementEntry(stmt.getStatement(), parameters);
+		}
+		else if(frame.hasPreference()) {
+			SharedPreference pref = frame.getPreference();
+			
+			List<String> stringSetValues = new ArrayList<String>();
+			for(int i=0; i<pref.getStringSetValueCount(); i++) {
+				stringSetValues.add(pref.getStringSetValue(i));
+			}
+			
+			return new SharedPreferenceEntry(pref.getFile(), pref.getKey(),
+					pref.getValue(), pref.getBooleanValue(), stringSetValues);
+		}
+		else if(frame.hasAttachment() || frame.hasSticker() || frame.hasAvatar()) {
 			int length;
-			if(backupFrame.hasAttachment()) {
-				length = backupFrame.getAttachment().getLength();
+			if(frame.hasAttachment()) {
+				length = frame.getAttachment().getLength();
 			}
-			else if(backupFrame.hasSticker()) {
-				length = backupFrame.getSticker().getLength();
+			else if(frame.hasSticker()) {
+				length = frame.getSticker().getLength();
 			}
-			else if(backupFrame.hasAvatar()) {
-				length = backupFrame.getAvatar().getLength();
+			else if(frame.hasAvatar()) {
+				length = frame.getAvatar().getLength();
 			}
 			else {
 				throw new SignalBackupReaderException("Internal error");
@@ -119,15 +176,40 @@ public class SignalBackupReader {
 			in.read(encBlob);
 			byte decBlob[] = decrypt(encBlob, false);
 			
+			if(decBlob.length!=length) {
+				throw new SignalBackupReaderException("Incorrect length of decrypted message");
+			}
 			
+			if(frame.hasAttachment()) {
+				Attachment a = frame.getAttachment();
+				return new AttachmentEntry(a.getRowId(), a.getAttachmentId(), decBlob);
+			}
+			else if(frame.hasSticker()) {
+				Sticker s = frame.getSticker();
+				return new StickerEntry(s.getRowId(), decBlob);
+			}
+			else if(frame.hasAvatar()) {
+				Avatar a = frame.getAvatar();
+				return new AvatarEntry(a.getName(), a.getRecipientId(), decBlob);
+			}
+			else {
+				throw new SignalBackupReaderException("Internal error");
+			}
+		}
+		else if(frame.hasVersion()) {
+			return new DatabaseVersionEntry(frame.getVersion().getVersion());
+		}
+		else if(frame.hasEnd()) {
+			return new EndEntry(frame.getEnd());
+		}
+		else if(frame.hasKeyValue()) {
+			KeyValue kv = frame.getKeyValue();
+			return new KeyValueEntry(kv.getKey(), kv.getBlobValue().toByteArray(),
+					kv.getBooleanValue(), kv.getFloatValue(), kv.getIntegerValue(),
+					kv.getLongValue(), kv.getStringValue());
 		}
 		
-		/*if(backupFrame.hasStatement()) {
-			System.out.println(backupFrame.getStatement().getStatement());
-		}*/
-		//Map<FieldDescriptor, Object>
-		
-		return true;
+		throw new SignalBackupReaderException("Unknown frame type");
 	}
 	
 	private byte[] decrypt(byte[] data, boolean frameMacCheck) throws InvalidKeyException, InvalidAlgorithmParameterException, SignalBackupReaderException, NoSuchAlgorithmException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException {
@@ -179,11 +261,11 @@ public class SignalBackupReader {
 		
 		byte buf[] = new byte[HEADER_SIZE];
 		in.read(buf);
-		dumpByteArray("headersize bytes", buf);
+		//dumpByteArray("headersize bytes", buf);
 		int headerSize = getInt(buf);
 		//System.out.println(headerSize);
 		long tmp = getUintFromBytes(buf);
-		System.out.println(tmp);
+		//System.out.println(tmp);
 		if(tmp>10000) {
 			byte[] buf2 = new byte[10];
 			in.read(buf2);

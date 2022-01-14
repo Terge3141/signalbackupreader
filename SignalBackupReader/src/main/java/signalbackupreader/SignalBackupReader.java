@@ -25,6 +25,8 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.thoughtcrime.securesms.backup.BackupProtos.Attachment;
 import org.thoughtcrime.securesms.backup.BackupProtos.Avatar;
 import org.thoughtcrime.securesms.backup.BackupProtos.BackupFrame;
@@ -41,6 +43,8 @@ import at.favre.lib.crypto.HKDF;
 import signalbackupreader.entry.*;
 
 public class SignalBackupReader {
+	
+	private static Logger logger = LogManager.getLogger(SignalBackupReader.class);
 	
 	private InputStream in;
 	private final int HEADER_SIZE = 4;
@@ -241,9 +245,7 @@ public class SignalBackupReader {
 			in.read(buf);
 			// dumpByteArray("headersize bytes", buf);
 			int headerSize = getInt(buf);
-			// System.out.println(headerSize);
 			long tmp = getUintFromBytes(buf);
-			// System.out.println(tmp);
 			if (tmp > 10000) {
 				byte[] buf2 = new byte[10];
 				in.read(buf2);
@@ -282,7 +284,7 @@ public class SignalBackupReader {
 		
 		dumpByteArray("Salt", salt);
 		dumpByteArray("Hash", hash);
-		System.out.println("Counter: " + counter);
+		logger.debug("Counter: " + counter);
 		
 		MessageDigest sha512;
 		try {
@@ -360,12 +362,16 @@ public class SignalBackupReader {
 	}
 	
 	private void dumpByteArray(String description, byte[] arr) {
+		
+		String str = "";
+		
 		if(description!=null) {
-			System.out.print(description + ": ");
+			str = str + description + ": ";
 		}
 		for(int i=0; i<arr.length; i++) {
-			System.out.print(String.format("%02X", arr[i]));
+			str = str + String.format("%02X", arr[i]);
 		}
-		System.out.println();
+		
+		logger.trace(str);
 	}
 }

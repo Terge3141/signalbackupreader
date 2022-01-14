@@ -7,9 +7,15 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import signalbackupreader.entry.*;
 
 public class DatabaseAndBlobDumper {
+	
+	private static Logger logger = LogManager.getLogger(DatabaseAndBlobDumper.class);
+	
 	private Path sqliteOutputPath;
 	private Path blobOutputDir;
 	private Connection connection;
@@ -42,6 +48,11 @@ public class DatabaseAndBlobDumper {
 			throw new SignalBackupReaderException(msg);
 		}
 		
+		logger.info("Reading backup file from '{}'", backupFilePath);
+		logger.info("Reading passphrase file from '{}'", passphrasePath);
+		logger.info("Writing sqlite file to '{}'", sqliteOutputPath);
+		
+		
 		this.signalBackupReader = new SignalBackupReader(backupFilePath, passphrasePath);	
 		String url = String.format("jdbc:sqlite:%s", sqliteOutputPath);
 		this.connection = DriverManager.getConnection(url);
@@ -49,6 +60,8 @@ public class DatabaseAndBlobDumper {
 	}
 	
 	public void run() throws SignalBackupReaderException, SQLException {
+		logger.info("Start dump");
+		
 		IEntry entry;
 		while ((entry = this.signalBackupReader.readNextEntry()) != null) {
 			if (entry instanceof SqlStatementEntry) {
@@ -67,6 +80,8 @@ public class DatabaseAndBlobDumper {
 			}
 		}
 		
+		logger.info("Writing to sql database");
 		connection.commit();
+		logger.info("Done");
 	}
 }

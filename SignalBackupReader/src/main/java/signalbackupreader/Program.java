@@ -16,9 +16,15 @@ import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import signalbackupreader.entry.*;
 
 public class Program {
+	
+	private static Logger logger = LogManager.getLogger(Program.class);
+	
 	public static void main(String args[]) throws SignalBackupReaderException, SQLException {
 		Path backupFilePath = Paths.get(args[0]);
 		Path passphrasePath = Paths.get(args[1]);
@@ -35,13 +41,13 @@ public class Program {
 		if(args.length>=3) {
 			Path sqlitePath = Paths.get(args[2]);
 			String url = String.format("jdbc:sqlite:%s", sqlitePath);
-			System.out.println("Using url " + url);
+			logger.info("Using url " + url);
 			conn = DriverManager.getConnection(url);
 			if (conn != null) {
 				conn.setAutoCommit(false);
 				DatabaseMetaData meta = conn.getMetaData();
-				System.out.println("The driver name is " + meta.getDriverName());
-				System.out.println("A new database has been created.");
+				logger.info("The driver name is " + meta.getDriverName());
+				logger.info("A new database has been created.");
 			}
 		}
 		
@@ -58,7 +64,7 @@ public class Program {
 		}
 		
 		if(conn != null) {
-			System.out.println("Commit");
+			logger.info("Commit");
 			conn.commit();
 			conn.close();
 		}

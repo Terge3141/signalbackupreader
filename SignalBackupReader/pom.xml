@@ -5,7 +5,7 @@
 	<groupId>com.terge</groupId>
 	<artifactId>SignalBackupReader</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>TODOName</name>
+	<name>Signal Backup Reader</name>
 	<description>A Reader for Signal Messenger backup files</description>
 	<dependencies>
 		<dependency>

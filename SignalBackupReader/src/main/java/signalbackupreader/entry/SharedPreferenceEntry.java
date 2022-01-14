@@ -1,3 +1,5 @@
+package signalbackupreader.entry;
+
 import java.util.List;
 
 public class SharedPreferenceEntry implements IEntry {

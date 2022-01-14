@@ -1,3 +1,4 @@
+package signalbackupreader.entry;
 
 public class AvatarEntry implements IEntry, IBlobEntry {
 

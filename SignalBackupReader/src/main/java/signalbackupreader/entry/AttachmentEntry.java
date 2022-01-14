@@ -1,3 +1,4 @@
+package signalbackupreader.entry;
 
 public class AttachmentEntry implements IEntry, IBlobEntry {
 

@@ -1,3 +1,4 @@
+package signalbackupreader.entry;
 
 public class KeyValueEntry implements IEntry {
 	

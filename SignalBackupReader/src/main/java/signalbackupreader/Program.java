@@ -1,3 +1,5 @@
+package signalbackupreader;
+
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -13,6 +15,8 @@ import java.sql.SQLException;
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
+
+import signalbackupreader.entry.*;
 
 public class Program {
 	public static void main(String args[]) throws SignalBackupReaderException, SQLException {

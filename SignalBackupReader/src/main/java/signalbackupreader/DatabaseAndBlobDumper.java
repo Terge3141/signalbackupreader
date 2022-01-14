@@ -1,9 +1,13 @@
+package signalbackupreader;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+
+import signalbackupreader.entry.*;
 
 public class DatabaseAndBlobDumper {
 	private Path sqliteOutputPath;

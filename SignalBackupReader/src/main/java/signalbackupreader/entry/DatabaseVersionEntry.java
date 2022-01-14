@@ -1,3 +1,5 @@
+package signalbackupreader.entry;
+
 public class DatabaseVersionEntry implements IEntry {
 	
 	private int version;

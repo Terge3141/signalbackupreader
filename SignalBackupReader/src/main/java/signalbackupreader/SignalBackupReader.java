@@ -1,3 +1,5 @@
+package signalbackupreader;
+
 import java.io.BufferedInputStream;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -36,6 +38,7 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 
 import at.favre.lib.crypto.HKDF;
+import signalbackupreader.entry.*;
 
 public class SignalBackupReader {
 	

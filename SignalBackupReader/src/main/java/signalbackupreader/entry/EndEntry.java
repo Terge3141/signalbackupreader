@@ -1,3 +1,4 @@
+package signalbackupreader.entry;
 
 public class EndEntry implements IEntry {
 

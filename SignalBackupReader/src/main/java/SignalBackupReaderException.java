@@ -5,4 +5,12 @@ public class SignalBackupReaderException extends Exception {
 	public SignalBackupReaderException(String msg) {
 		super(msg);
 	}
+
+	public SignalBackupReaderException(String message, Throwable cause) {
+		super(message, cause);
+	}
+
+	public SignalBackupReaderException(Throwable cause) {
+		super(cause);
+	}
 }

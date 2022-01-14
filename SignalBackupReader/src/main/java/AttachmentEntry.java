@@ -1,5 +1,5 @@
 
-public class AttachmentEntry implements IEntry {
+public class AttachmentEntry implements IEntry, IBlobEntry {
 
 	private long rowId;
 	private long attachmentId;
@@ -9,6 +9,11 @@ public class AttachmentEntry implements IEntry {
 		this.rowId = rowId;
 		this.attachmentId = attachmentId;
 		this.blob = blob;
+	}
+
+	@Override
+	public String getNamePrefix() {
+		return String.format("Attachment_%d", attachmentId);
 	}
 
 	public long getRowId() {
@@ -27,6 +32,7 @@ public class AttachmentEntry implements IEntry {
 		this.attachmentId = attachmentId;
 	}
 
+	@Override
 	public byte[] getBlob() {
 		return blob;
 	}

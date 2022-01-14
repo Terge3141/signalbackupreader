@@ -1,5 +1,5 @@
 
-public class StickerEntry implements IEntry {
+public class StickerEntry implements IEntry, IBlobEntry {
 
 	private long rowId;
 	private byte[] blob;
@@ -7,6 +7,11 @@ public class StickerEntry implements IEntry {
 	public StickerEntry(long rowId, byte[] blob) {
 		this.rowId = rowId;
 		this.blob = blob;
+	}
+	
+	@Override
+	public String getNamePrefix() {
+		return String.format("Sticker_%04d", rowId);
 	}
 
 	public long getRowId() {

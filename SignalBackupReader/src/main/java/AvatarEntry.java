@@ -1,5 +1,5 @@
 
-public class AvatarEntry implements IEntry {
+public class AvatarEntry implements IEntry, IBlobEntry {
 
 	private String avatarName;
 	private String recipientId;
@@ -9,6 +9,11 @@ public class AvatarEntry implements IEntry {
 		this.avatarName = avatarName;
 		this.recipientId = recipientId;
 		this.blob = blob;
+	}
+	
+	@Override
+	public String getNamePrefix() {
+		return String.format("Avatar_%s", recipientId);
 	}
 
 	public String getRecipientId() {

@@ -17,7 +17,14 @@ import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 
 public class Program {
-	public static void main(String args[]) throws IOException, SignalBackupReaderException, NoSuchAlgorithmException, InvalidKeyException, NoSuchPaddingException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, SQLException {
+	public static void main(String args[]) throws SignalBackupReaderException, SQLException {
+		Path backupFilePath = Paths.get(args[0]);
+		Path passphrasePath = Paths.get(args[1]);
+		Path outputDir = Paths.get(args[2]);
+		DatabaseAndBlobDumper dumper = new DatabaseAndBlobDumper(backupFilePath, passphrasePath, outputDir);
+		dumper.run();
+	}
+	public static void main2(String args[]) throws IOException, SignalBackupReaderException, NoSuchAlgorithmException, InvalidKeyException, NoSuchPaddingException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, SQLException {
 		Path backupPath = Paths.get(args[0]);
 		Path passphrasePath = Paths.get(args[1]);
 
@@ -28,6 +35,7 @@ public class Program {
 			System.out.println("Using url " + url);
 			conn = DriverManager.getConnection(url);
 			if (conn != null) {
+				conn.setAutoCommit(false);
 				DatabaseMetaData meta = conn.getMetaData();
 				System.out.println("The driver name is " + meta.getDriverName());
 				System.out.println("A new database has been created.");
@@ -44,7 +52,7 @@ public class Program {
 		
 		SignalBackupReader sbr = new SignalBackupReader(backupPath, passphrasePath);
 		IEntry entry;
-		while((entry = sbr.readBackupFrame()) != null) {
+		while((entry = sbr.readNextEntry()) != null) {
 			if(entry instanceof SqlStatementEntry) {
 				if(conn != null) {
 					SqlStatementEntry stmt = (SqlStatementEntry)entry;
@@ -55,6 +63,8 @@ public class Program {
 		}
 		
 		if(conn != null) {
+			System.out.println("Commit");
+			conn.commit();
 			conn.close();
 		}
 	}

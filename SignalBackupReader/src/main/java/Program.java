@@ -1,6 +1,4 @@
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.PrintStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.InvalidAlgorithmParameterException;
@@ -24,7 +22,8 @@ public class Program {
 		DatabaseAndBlobDumper dumper = new DatabaseAndBlobDumper(backupFilePath, passphrasePath, outputDir);
 		dumper.run();
 	}
-	public static void main2(String args[]) throws IOException, SignalBackupReaderException, NoSuchAlgorithmException, InvalidKeyException, NoSuchPaddingException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, SQLException {
+	
+	public static void main_useSignalBackupReader(String args[]) throws IOException, SignalBackupReaderException, NoSuchAlgorithmException, InvalidKeyException, NoSuchPaddingException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, SQLException {
 		Path backupPath = Paths.get(args[0]);
 		Path passphrasePath = Paths.get(args[1]);
 
@@ -41,14 +40,6 @@ public class Program {
 				System.out.println("A new database has been created.");
 			}
 		}
-		
-		
-		
-		if(false) {
-			PrintStream ps = new PrintStream(new FileOutputStream("/tmp/log.txt"));
-			System.setOut(ps);
-		}
-		
 		
 		SignalBackupReader sbr = new SignalBackupReader(backupPath, passphrasePath);
 		IEntry entry;

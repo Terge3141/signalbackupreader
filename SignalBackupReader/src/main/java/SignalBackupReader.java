@@ -11,22 +11,18 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Set;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.Mac;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-import org.thoughtcrime.securesms.backup.*;
 import org.thoughtcrime.securesms.backup.BackupProtos.Attachment;
 import org.thoughtcrime.securesms.backup.BackupProtos.Avatar;
 import org.thoughtcrime.securesms.backup.BackupProtos.BackupFrame;
@@ -37,7 +33,6 @@ import org.thoughtcrime.securesms.backup.BackupProtos.SqlStatement;
 import org.thoughtcrime.securesms.backup.BackupProtos.Sticker;
 
 import com.google.protobuf.ByteString;
-import com.google.protobuf.Descriptors.FieldDescriptor;
 import com.google.protobuf.InvalidProtocolBufferException;
 
 import at.favre.lib.crypto.HKDF;

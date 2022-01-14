@@ -25,7 +25,7 @@ public class DatabaseAndBlobDumper {
 			Path blobOutputDir)
 			throws SignalBackupReaderException, SQLException {
 		this.blobOutputDir = blobOutputDir;
-		this.sqliteOutputPath = this.blobOutputDir.resolve("database.sql");
+		this.sqliteOutputPath = this.blobOutputDir.resolve("database.sqlite");
 		
 		if(!backupFilePath.toFile().exists()) {
 			String msg = String.format("Signal backup file '%s' does not exist",

@@ -7,6 +7,10 @@
 	<version>0.0.1-SNAPSHOT</version>
 	<name>Signal Backup Reader</name>
 	<description>A Reader for Signal Messenger backup files</description>
+	<properties>
+		<maven.compiler.source>11</maven.compiler.source>
+		<maven.compiler.target>11</maven.compiler.target>
+	 </properties>
 	<dependencies>
 		<dependency>
 			<groupId>com.google.protobuf</groupId>

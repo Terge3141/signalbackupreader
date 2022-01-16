@@ -50,3 +50,8 @@ java -cp target/SignalBackupReader-0.0.1-SNAPSHOT-jar-with-dependencies.jar sign
 * backuppath: Path to the android signal messenger file, normally has the name signal-YYYY-MM-DD-HH-MM-SS.backup
 * passphrasepath: Pass to the signal passphrase file. Should contain the 30 digits, spaces and new lines are ignored.
 * outputdir: the outputdir were the sql data base and the blobs are written to.
+
+## Jitpack
+The packages can also be obtained from jitpack.io and directly included into gradle or maven.
+*Replace tag with the git hash or "master-SNAPSHOT" for the latest version.*
+Go to https://jitpack.io/#Terge3141/signalbackupreader for further information.

@@ -30,6 +30,9 @@ public class Program {
 		Path passphrasePath = Paths.get(args[1]);
 		Path outputDir = Paths.get(args[2]);
 		DatabaseAndBlobDumper dumper = new DatabaseAndBlobDumper(backupFilePath, passphrasePath, outputDir);
+		
+		// Create extra sql views, see Readme for more details
+		dumper.setCreateExtraSqlViews(true);
 		dumper.run();
 	}
 	

@@ -27,7 +27,27 @@ public class DatabaseAndBlobDumper {
 	private SignalBackupReader signalBackupReader;
 	private List<String> sqlViewCmds;
 	
-	public DatabaseAndBlobDumper(Path backupFilePath, Path passphrasePath,
+	public static DatabaseAndBlobDumper of(Path backupFilePath, Path passphrasePath,
+			Path blobOutputDir)
+			throws SignalBackupReaderException, SQLException {
+		logger.info("Reading passphrase file from '{}'", passphrasePath);
+		try {
+			String passphrase = Files.readString(passphrasePath);
+			return new DatabaseAndBlobDumper(backupFilePath, passphrase, blobOutputDir);
+		} catch (IOException e) {
+			String msg = String.format("Cannot read passphrase file '%s'",
+					passphrasePath);
+			throw new SignalBackupReaderException(msg, e);
+		}
+	}
+	
+	public static DatabaseAndBlobDumper of(Path backupFilePath, String passphrase,
+			Path blobOutputDir)
+			throws SignalBackupReaderException, SQLException {
+		return new DatabaseAndBlobDumper(backupFilePath, passphrase, blobOutputDir);
+	}
+	
+	private DatabaseAndBlobDumper(Path backupFilePath, String passphrase,
 			Path blobOutputDir)
 			throws SignalBackupReaderException, SQLException {
 		this.blobOutputDir = blobOutputDir;
@@ -67,10 +87,9 @@ public class DatabaseAndBlobDumper {
 		}
 		
 		logger.info("Reading backup file from '{}'", backupFilePath);
-		logger.info("Reading passphrase file from '{}'", passphrasePath);
 		logger.info("Writing sqlite file to '{}'", sqliteOutputPath);
 		
-		this.signalBackupReader = new SignalBackupReader(backupFilePath, passphrasePath);	
+		this.signalBackupReader = new SignalBackupReader(backupFilePath, passphrase);	
 		String url = String.format("jdbc:sqlite:%s", sqliteOutputPath);
 		this.connection = DriverManager.getConnection(url);
 		this.connection.setAutoCommit(false);
@@ -118,6 +137,10 @@ public class DatabaseAndBlobDumper {
 		this.doCreateExtraSqlViews = doCreateSqlViews;
 	}
 	
+	public Path getSqliteOutputPath() {
+		return sqliteOutputPath;
+	}
+
 	private void createSqlViews(Connection connection) throws SQLException {
 		for(String sql : this.sqlViewCmds) {
 			connection.createStatement().execute(sql);

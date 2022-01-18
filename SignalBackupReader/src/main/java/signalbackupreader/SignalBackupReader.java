@@ -56,22 +56,17 @@ public class SignalBackupReader {
 	private long counter;
 	private byte[] ivBytes;
 	
+	public SignalBackupReader(Path backupPath, String passphrase) throws SignalBackupReaderException {
+		setup(backupPath, passphrase);
+	}
+	
 	public SignalBackupReader(Path backupPath, Path passphrasePath) throws SignalBackupReaderException {
 		try {
-			this.in = new BufferedInputStream(new FileInputStream(backupPath.toFile()));
-		} catch (FileNotFoundException e) {
-			String msg = String.format("Cannot open signal backup file '%s'", backupPath);
-			throw new SignalBackupReaderException(msg, e);
-		}
-		
-		try {
-			this.passphrase = readPassphrase(passphrasePath);
+			setup(backupPath, Files.readString(passphrasePath));
 		} catch (IOException e) {
 			String msg = String.format("Cannot read passphrase file '%s'", passphrasePath);
 			throw new SignalBackupReaderException(msg, e);
 		}
-		
-		readKeys();
 	}
 	
 	public IEntry readNextEntry() throws SignalBackupReaderException {
@@ -189,6 +184,19 @@ public class SignalBackupReader {
 		}
 		
 		throw new SignalBackupReaderException("Unknown frame type");
+	}
+	
+	private void setup(Path backupPath, String passphrase) throws SignalBackupReaderException {
+		try {
+			this.in = new BufferedInputStream(new FileInputStream(backupPath.toFile()));
+		} catch (FileNotFoundException e) {
+			String msg = String.format("Cannot open signal backup file '%s'", backupPath);
+			throw new SignalBackupReaderException(msg, e);
+		}
+		
+		this.passphrase = trimPassphrase(passphrase);
+
+		readKeys();
 	}
 	
 	private byte[] decrypt(byte[] data, boolean frameMacCheck) throws SignalBackupReaderException {
@@ -349,8 +357,8 @@ public class SignalBackupReader {
 	    return Arrays.copyOfRange(arr, arr.length-4, arr.length);
 	}
 	
-	private String readPassphrase(Path passphrasePath) throws IOException, SignalBackupReaderException {
-		String buf = Files.readString(passphrasePath);
+	private String trimPassphrase(String passphrase) throws SignalBackupReaderException {
+		String buf = passphrase;
 		buf = buf.replace(" ", "").replace("\n", "");
 		if(buf.length()!=PASSPHRASE_LENGH) {
 			String msg = String.format("Passphrase length is not %d but %d. Passhrase is %s",

@@ -6,5 +6,5 @@ module signalbackupreader {
 	requires com.google.protobuf;
 	requires hkdf;
 	requires java.sql;
-	requires transitive org.apache.logging.log4j;
+	requires org.apache.logging.log4j;
 }

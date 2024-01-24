@@ -33,6 +33,7 @@ public class Program {
 		
 		// Create extra sql views, see Readme for more details
 		dumper.setCreateExtraSqlViews(true);
+		dumper.setAllowsOverrides(true);
 		dumper.run();
 	}
 	

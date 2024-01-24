@@ -21,12 +21,14 @@ public class DatabaseAndBlobDumper {
 	private static Logger logger = LogManager.getLogger(DatabaseAndBlobDumper.class);
 	
 	private Path sqliteOutputPath;
+	private Path backupFilePath;
+	private String passphrase;
 	private Path blobOutputDir;
 	private boolean doCreateExtraSqlViews = false;
+	private boolean allowOverrides = false;
 	private Connection connection;
 	private SignalBackupReader signalBackupReader;
-	private List<String> sqlViewCmds;
-	
+
 	public static DatabaseAndBlobDumper of(Path backupFilePath, Path passphrasePath,
 			Path blobOutputDir)
 			throws SignalBackupReaderException, SQLException {
@@ -50,8 +52,14 @@ public class DatabaseAndBlobDumper {
 	private DatabaseAndBlobDumper(Path backupFilePath, String passphrase,
 			Path blobOutputDir)
 			throws SignalBackupReaderException, SQLException {
+		this.backupFilePath = backupFilePath;
+		this.passphrase = passphrase;
 		this.blobOutputDir = blobOutputDir;
+		
 		this.sqliteOutputPath = this.blobOutputDir.resolve("database.sqlite");
+	}
+	
+	private void checkAndCreateDirs() throws SignalBackupReaderException {
 		
 		if(!backupFilePath.toFile().exists()) {
 			String msg = String.format("Signal backup file '%s' does not exist",
@@ -60,31 +68,52 @@ public class DatabaseAndBlobDumper {
 		}
 		
 		if(blobOutputDir.toFile().exists()) {
-			String msg = String.format("Blob directory '%s' already exists", this.blobOutputDir);
-			throw new SignalBackupReaderException(msg);
-		}
-		
-		if(!blobOutputDir.toFile().mkdirs()) {
-			String msg = String.format("Cannot create directory '%s'", this.blobOutputDir);
-			throw new SignalBackupReaderException(msg);
+			if(!isAllowOverrides()) {
+				String msg = String.format("Blob directory '%s' already exists", this.blobOutputDir);
+				throw new SignalBackupReaderException(msg);
+			}
+		} else {
+			if(!blobOutputDir.toFile().mkdirs()) {
+				String msg = String.format("Cannot create directory '%s'", this.blobOutputDir);
+				throw new SignalBackupReaderException(msg);
+			}
 		}
 		
 		if(sqliteOutputPath.toFile().exists()) {
-			String msg = String.format("Sqlite file '%s' already exists", this.sqliteOutputPath);
-			throw new SignalBackupReaderException(msg);
+			if(isAllowOverrides()) {
+				if(!sqliteOutputPath.toFile().delete()) {
+					String msg = String.format("Could not delete sqlite file '%s'", this.sqliteOutputPath);
+					throw new SignalBackupReaderException(msg);
+				}
+			} else {
+				String msg = String.format("Sqlite file '%s' already exists", this.sqliteOutputPath);
+				throw new SignalBackupReaderException(msg);
+			}
 		}
-		
-		sqlViewCmds = new ArrayList<String>();
+	}
+	
+	private List<String> getSqlViewCmds() throws SignalBackupReaderException {
+		List<String> sqlViewCmds = new ArrayList<String>();
 		try {
 			sqlViewCmds.add(loadResourceToString("v_00_sms_corrected.sql.txt"));
 			sqlViewCmds.add(loadResourceToString("v_01_mms_corrected.sql.txt"));
 			sqlViewCmds.add(loadResourceToString("v_02_all_names.sql.txt"));
 			sqlViewCmds.add(loadResourceToString("v_03_all_messages.sql.txt"));
 			sqlViewCmds.add(loadResourceToString("v_04_chats.sql.txt"));
+			sqlViewCmds.add(loadResourceToString("v_05_stickers.sql.txt"));
 		} catch (IOException e) {
 			String msg = "Cannot load internal sql resource file";
 			throw new SignalBackupReaderException(msg, e);
 		}
+		
+		return sqlViewCmds;
+	}
+	
+	public void run() throws SignalBackupReaderException, SQLException {
+		logger.info("Start dump");
+		
+		checkAndCreateDirs();
+		List<String> sqlViewCmds = getSqlViewCmds();
 		
 		logger.info("Reading backup file from '{}'", backupFilePath);
 		logger.info("Writing sqlite file to '{}'", sqliteOutputPath);
@@ -93,10 +122,6 @@ public class DatabaseAndBlobDumper {
 		String url = String.format("jdbc:sqlite:%s", sqliteOutputPath);
 		this.connection = DriverManager.getConnection(url);
 		this.connection.setAutoCommit(false);
-	}
-	
-	public void run() throws SignalBackupReaderException, SQLException {
-		logger.info("Start dump");
 		
 		IEntry entry;
 		while ((entry = this.signalBackupReader.readNextEntry()) != null) {
@@ -122,7 +147,7 @@ public class DatabaseAndBlobDumper {
 		
 		if(isCreateExtraSqlViews()) {
 			logger.info("Creating extra views");
-			createSqlViews(connection);
+			executeStatements(connection, sqlViewCmds);
 			connection.commit();
 			logger.info("Done");
 		}
@@ -137,12 +162,20 @@ public class DatabaseAndBlobDumper {
 		this.doCreateExtraSqlViews = doCreateSqlViews;
 	}
 	
+	public boolean isAllowOverrides() {
+		return this.allowOverrides;
+	}
+	
+	public void setAllowsOverrides(boolean allowOverrides) {
+		this.allowOverrides = allowOverrides;
+	}
+	
 	public Path getSqliteOutputPath() {
 		return sqliteOutputPath;
 	}
 
-	private void createSqlViews(Connection connection) throws SQLException {
-		for(String sql : this.sqlViewCmds) {
+	private void executeStatements(Connection connection, List<String> sqlStatements) throws SQLException {
+		for(String sql : sqlStatements) {
 			connection.createStatement().execute(sql);
 		}
 	}

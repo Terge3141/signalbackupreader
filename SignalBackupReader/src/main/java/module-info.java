@@ -1,5 +1,5 @@
 module signalbackupreader {
-	exports org.thoughtcrime.securesms.backup;
+	exports org.thoughtcrime.securesms.backup.proto;
 	exports signalbackupreader;
 	exports signalbackupreader.entry;
 

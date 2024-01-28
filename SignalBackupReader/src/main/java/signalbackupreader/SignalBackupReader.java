@@ -28,14 +28,14 @@ import javax.crypto.spec.SecretKeySpec;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.thoughtcrime.securesms.backup.BackupProtos.Attachment;
-import org.thoughtcrime.securesms.backup.BackupProtos.Avatar;
-import org.thoughtcrime.securesms.backup.BackupProtos.BackupFrame;
-import org.thoughtcrime.securesms.backup.BackupProtos.Header;
-import org.thoughtcrime.securesms.backup.BackupProtos.KeyValue;
-import org.thoughtcrime.securesms.backup.BackupProtos.SharedPreference;
-import org.thoughtcrime.securesms.backup.BackupProtos.SqlStatement;
-import org.thoughtcrime.securesms.backup.BackupProtos.Sticker;
+import org.thoughtcrime.securesms.backup.proto.Backups.Attachment;
+import org.thoughtcrime.securesms.backup.proto.Backups.Avatar;
+import org.thoughtcrime.securesms.backup.proto.Backups.BackupFrame;
+import org.thoughtcrime.securesms.backup.proto.Backups.Header;
+import org.thoughtcrime.securesms.backup.proto.Backups.KeyValue;
+import org.thoughtcrime.securesms.backup.proto.Backups.SharedPreference;
+import org.thoughtcrime.securesms.backup.proto.Backups.SqlStatement;
+import org.thoughtcrime.securesms.backup.proto.Backups.Sticker;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -57,6 +57,7 @@ public class SignalBackupReader {
 	private byte cypherKey[];
 	private long counter;
 	private byte[] ivBytes;
+	private int backupFileVersion;
 	
 	public SignalBackupReader(Path backupPath, String passphrase) throws SignalBackupReaderException {
 		setup(backupPath, passphrase);
@@ -76,7 +77,19 @@ public class SignalBackupReader {
 		
 		dumpByteArray("cypherKey", cypherKey);
 		
-		byte[] data = nextBlock_new();
+		logger.info("Backupfile version {}", this.backupFileVersion);
+		
+		/*System.out.println("backupFileVersion: " + backupFileVersion);
+		if(true) return null;*/
+		/*if(true) return null;*/
+		
+		//byte[] data = getNextDecryptedBlock();
+		byte[] data;
+		if(backupFileVersion==0) {
+			data = getNextDecryptedBlockLegacy();
+		} else {
+			data = getNextDecryptedBlock();
+		}
 		
 		if(data==null) {
 			return null;
@@ -207,6 +220,16 @@ public class SignalBackupReader {
 		readKeys();
 	}
 	
+	private byte[] getNextDecryptedBlockLegacy() throws SignalBackupReaderException {
+		byte[] data = readLegacyBlock();
+		
+		if(data==null) {
+			return null;
+		}
+		
+		return decrypt(data, true);
+	}
+	
 	private byte[] decrypt(byte[] data, boolean frameMacCheck) throws SignalBackupReaderException {
 		byte[] encrypted = Arrays.copyOf(data, data.length-10);
 		byte[] theirMac = Arrays.copyOfRange(data, data.length - 10, data.length);
@@ -251,7 +274,7 @@ public class SignalBackupReader {
 		return decrypted;
 	}
 	
-	private byte[] nextBlock() throws SignalBackupReaderException {
+	private byte[] readLegacyBlock() throws SignalBackupReaderException {
 		// TODO backupversion==0 --> old, see FileDecryptor::getFrame:24
 		try {
 			if (in.available() < HEADER_SIZE) {
@@ -260,17 +283,8 @@ public class SignalBackupReader {
 
 			byte buf[] = new byte[HEADER_SIZE];
 			in.read(buf);
-			dumpByteArray("headersize bytes", buf);
 			int headerSize = getInt(buf);
-			long tmp = getUintFromBytes(buf);
-			if (tmp > 10000) {
-				byte[] buf2 = new byte[10];
-				in.read(buf2);
-				System.out.println("headerSize: " + headerSize);
-				System.out.println("tmp: " + tmp);
-				dumpByteArray("buf", buf2);
-				throw new IOException();
-			}
+
 			byte data[] = new byte[headerSize];
 			in.read(data);
 
@@ -280,7 +294,7 @@ public class SignalBackupReader {
 		}
 	}
 	
-	private byte[] nextBlock_new() throws SignalBackupReaderException {
+	private byte[] getNextDecryptedBlock() throws SignalBackupReaderException {
 		
 		byte encryptedEncryptedFrameLength[] = new byte[HEADER_SIZE];
 		try {
@@ -392,7 +406,7 @@ public class SignalBackupReader {
 	
 	// http://jhnet.co.uk/articles/signal_backups
 	private void readKeys() throws SignalBackupReaderException {
-		byte data[] = nextBlock();
+		byte data[] = readLegacyBlock();
 		
 		BackupFrame backupFrame;
 		try {
@@ -403,6 +417,8 @@ public class SignalBackupReader {
 		Header header = backupFrame.getHeader();
 		ByteString ivByteString = header.getIv();
 		ByteString saltByteString = header.getSalt();
+		this.backupFileVersion = header.getVersion();
+		//System.out.println("version: " + backupFrame.getHeader().get);
 		
 		byte salt[] = saltByteString.toByteArray();
 		byte passphraseBytes[] = this.passphrase.getBytes(StandardCharsets.US_ASCII);

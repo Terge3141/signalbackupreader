@@ -49,7 +49,7 @@ public class SignalBackupReader {
 	
 	private InputStream in;
 	private final int HEADER_SIZE = 4;
-	private final int PASSPHRASE_LENGH = 30;
+	private final int PASSPHRASE_LENGTH = 30;
 	private final int MACSIZE = 10;
 	private final String HKDF_INFO = "Backup Export";
 	private String passphrase;
@@ -448,9 +448,9 @@ public class SignalBackupReader {
 	private String trimPassphrase(String passphrase) throws SignalBackupReaderException {
 		String buf = passphrase;
 		buf = buf.replace(" ", "").replace("\n", "");
-		if(buf.length()!=PASSPHRASE_LENGH) {
+		if(buf.length()!=PASSPHRASE_LENGTH) {
 			String msg = String.format("Passphrase length is not %d but %d. Passhrase is %s",
-					PASSPHRASE_LENGH, buf.length(), buf);
+					PASSPHRASE_LENGTH, buf.length(), buf);
 			throw new SignalBackupReaderException(msg);
 		}
 		

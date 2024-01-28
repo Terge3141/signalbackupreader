@@ -227,17 +227,8 @@ public class SignalBackupReader {
 		    System.arraycopy(encrypted, 0, macInput, ivBytes.length, encrypted.length);
 		}
 		
-		byte[] myMac;
-		try {
-			Mac sha256_HMAC = Mac.getInstance("HmacSHA256");
-			SecretKeySpec secret_key = new SecretKeySpec(hmacKeys, "HmacSHA256");
-			sha256_HMAC.init(secret_key);
-			
-			myMac = sha256_HMAC.doFinal(macInput);
-			myMac = Arrays.copyOf(myMac, theirMac.length);
-		} catch (NoSuchAlgorithmException | InvalidKeyException e) {
-			throw new SignalBackupReaderException("Cannot initialize MAC calculator", e);
-		}
+		byte[] myMac = getHmac().doFinal(macInput);
+		myMac = Arrays.copyOf(myMac, theirMac.length);
 		
 		if(!Arrays.equals(myMac, theirMac)) {
 			dumpByteArray("theirmac", theirMac);
@@ -304,14 +295,7 @@ public class SignalBackupReader {
 		
 		incCounter();
 		
-		Mac sha256_HMAC;
-		try {
-			sha256_HMAC = Mac.getInstance("HmacSHA256");
-			SecretKeySpec secret_key = new SecretKeySpec(hmacKeys, "HmacSHA256");
-			sha256_HMAC.init(secret_key);
-		} catch (NoSuchAlgorithmException | InvalidKeyException e) {
-			throw new SignalBackupReaderException("Cannot initialize MAC calculator", e);
-		}
+		Mac hmac = getHmac();
 		
 		Cipher cipher;
 		try {
@@ -323,7 +307,7 @@ public class SignalBackupReader {
 			byte[] decrypted = cipher.update(encryptedEncryptedFrameLength);
 			encryptedFrameLength = (int)getUintFromBytes(decrypted);
 			
-			sha256_HMAC.update(encryptedEncryptedFrameLength);
+			hmac.update(encryptedEncryptedFrameLength);
 		} catch (InvalidKeyException | NoSuchAlgorithmException | NoSuchPaddingException
 				| InvalidAlgorithmParameterException e) {
 			throw new SignalBackupReaderException("Cannot decrypt frame length", e);
@@ -345,8 +329,8 @@ public class SignalBackupReader {
 		
 		dumpByteArray("encrypted", encrypted);
 		
-		sha256_HMAC.update(encrypted);
-		byte[] myMac = Arrays.copyOfRange(sha256_HMAC.doFinal(), 0, theirMac.length);
+		hmac.update(encrypted);
+		byte[] myMac = Arrays.copyOfRange(hmac.doFinal(), 0, theirMac.length);
 		
 		if(!Arrays.equals(myMac, theirMac)) {
 			dumpByteArray("theirmac", theirMac);
@@ -411,6 +395,19 @@ public class SignalBackupReader {
 		byte keys[] = HKDF.fromHmacSha256().expand(res, info, 64);
 		this.cypherKey = Arrays.copyOf(keys, 32);
 		this.hmacKeys = Arrays.copyOfRange(keys, 32, 64);
+	}
+	
+	private Mac getHmac() throws SignalBackupReaderException {
+		Mac hmac;
+		try {
+			hmac = Mac.getInstance("HmacSHA256");
+			SecretKeySpec secret_key = new SecretKeySpec(hmacKeys, "HmacSHA256");
+			hmac.init(secret_key);
+		} catch (NoSuchAlgorithmException | InvalidKeyException e) {
+			throw new SignalBackupReaderException("Cannot initialize MAC calculator", e);
+		}
+		
+		return hmac;
 	}
 	
 	private void incCounter() {

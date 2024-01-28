@@ -313,6 +313,7 @@ public class SignalBackupReader {
 			throw new SignalBackupReaderException("Cannot decrypt frame length", e);
 		}
 		
+		// 115343360: Reasonable limit, see https://github.com/bepaald/signalbackup-tools/blob/7dd5cd49817009bf422361f4e966ee62124f7a26/filedecryptor/getframe.cc#L113
 		if(encryptedFrameLength > 115343360 || encryptedFrameLength < 11) {
 			throw new SignalBackupReaderException(String.format("Unexpected header size: %d", encryptedFrameLength));
 		}

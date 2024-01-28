@@ -49,6 +49,7 @@ public class SignalBackupReader {
 	private InputStream in;
 	private final int HEADER_SIZE = 4;
 	private final int PASSPHRASE_LENGH = 30;
+	private final int MACSIZE = 10;
 	private final String HKDF_INFO = "Backup Export";
 	private String passphrase;
 	private byte hmacKeys[];
@@ -70,13 +71,19 @@ public class SignalBackupReader {
 	}
 	
 	public IEntry readNextEntry() throws SignalBackupReaderException {
-		byte[] data = nextBlock();
+		logger.info("readNextEntry");
+		
+		dumpByteArray("cypherKey", cypherKey);
+		
+		byte[] data = nextBlock_new();
 		
 		if(data==null) {
 			return null;
 		}
 		
-		byte decrypted[] = decrypt(data, true);
+		// TODO need for old
+		//byte decrypted[] = decrypt(data, true);
+		byte[] decrypted = data;
 		
 		BackupFrame frame;
 		try {
@@ -244,6 +251,7 @@ public class SignalBackupReader {
 	}
 	
 	private byte[] nextBlock() throws SignalBackupReaderException {
+		// TODO backupversion==0 --> old, see FileDecryptor::getFrame:24
 		try {
 			if (in.available() < HEADER_SIZE) {
 				return null;
@@ -251,12 +259,14 @@ public class SignalBackupReader {
 
 			byte buf[] = new byte[HEADER_SIZE];
 			in.read(buf);
-			// dumpByteArray("headersize bytes", buf);
+			dumpByteArray("headersize bytes", buf);
 			int headerSize = getInt(buf);
 			long tmp = getUintFromBytes(buf);
 			if (tmp > 10000) {
 				byte[] buf2 = new byte[10];
 				in.read(buf2);
+				System.out.println("headerSize: " + headerSize);
+				System.out.println("tmp: " + tmp);
 				dumpByteArray("buf", buf2);
 				throw new IOException();
 			}
@@ -268,6 +278,91 @@ public class SignalBackupReader {
 			throw new SignalBackupReaderException("Error reading signal file", e);
 		}
 	}
+	
+	private byte[] nextBlock_new() throws SignalBackupReaderException {
+		
+		byte encryptedEncryptedFrameLength[] = new byte[HEADER_SIZE];
+		try {
+			if (in.available() < HEADER_SIZE) {
+				return null;
+			}
+			
+			in.read(encryptedEncryptedFrameLength);
+			dumpByteArray("encrypted_encryptedframelength bytes", encryptedEncryptedFrameLength);
+		} catch (IOException e) {
+			throw new SignalBackupReaderException("Error reading signal file", e);
+		}
+		
+		SecretKey secretKey = new SecretKeySpec(cypherKey, 0, cypherKey.length, "AES");
+		
+		//incCounter();
+		
+		logger.info("counter: " + counter);
+		
+		int encryptedFrameLength;
+		IvParameterSpec ivSpec = new IvParameterSpec(ivBytes);
+		
+		incCounter();
+		
+		Cipher cipher;
+		try {
+			cipher = Cipher.getInstance("AES/CTR/NoPadding");
+			cipher.init(Cipher.ENCRYPT_MODE, secretKey, ivSpec);
+			
+			dumpByteArray("encryptedEncryptedFrameLength", encryptedEncryptedFrameLength);
+			
+			//byte[] decrypted = cipher.doFinal(encryptedEncryptedFrameLength);
+			byte[] decrypted = cipher.update(encryptedEncryptedFrameLength);
+			encryptedFrameLength = (int)getUintFromBytes(decrypted);
+			
+			dumpByteArray("decrypted", decrypted);
+			logger.info("encryptedFrameLength: " + encryptedFrameLength);
+		} catch (InvalidKeyException | NoSuchAlgorithmException | NoSuchPaddingException
+				| InvalidAlgorithmParameterException e) {
+			throw new SignalBackupReaderException("Cannot decrypt frame length", e);
+		}
+		
+		if(encryptedFrameLength > 115343360 || encryptedFrameLength < 11) {
+			throw new SignalBackupReaderException(String.format("Unexpected header size: %d", encryptedFrameLength));
+		}
+		
+		byte[] encryptedFrame = new byte[encryptedFrameLength];
+		// TODO check if encryptedFrameLength bytes are read
+		try {
+			in.read(encryptedFrame);
+		} catch (IOException e) {
+			throw new SignalBackupReaderException("Could not read encryptedFrame", e);
+		}
+		
+		byte[] encrypted = Arrays.copyOf(encryptedFrame, encryptedFrame.length - MACSIZE);
+		byte[] theirMac = Arrays.copyOfRange(encryptedFrame, encryptedFrame.length - MACSIZE, encryptedFrame.length);
+		
+		dumpByteArray("encrypted", encrypted);
+		
+		/*byte[] myMac = HKDF.fromHmacSha256().extract(hmacKeys, encrypted);
+		myMac = Arrays.copyOf(myMac, theirMac.length);
+		
+		if(!Arrays.equals(myMac, theirMac)) {
+			dumpByteArray("theirmac", theirMac);
+			dumpByteArray("mymac", myMac);
+			throw new SignalBackupReaderException("mymac and theirmac differ");
+		}*/
+		
+		try {
+			byte[] decryptedBlock = cipher.doFinal(encrypted);
+			dumpByteArray("decryptedBlock", decryptedBlock);
+			return decryptedBlock;
+		} catch (IllegalBlockSizeException | BadPaddingException e) {
+			throw new SignalBackupReaderException("Cannot decrypt backup frame", e);
+		}
+	}
+	
+	/*
+	 * first frame:
+	 * tool: 0xE6CEA859 --> 0x3C
+	 * here: 0x59A8CEE6 --> same other order
+	 * 
+	 */
 	
 	
 	// http://jhnet.co.uk/articles/signal_backups
@@ -292,7 +387,7 @@ public class SignalBackupReader {
 		
 		dumpByteArray("Salt", salt);
 		dumpByteArray("Hash", hash);
-		logger.debug("Counter: " + counter);
+		logger.info("Counter: " + counter);
 		
 		MessageDigest sha512;
 		try {
@@ -380,6 +475,6 @@ public class SignalBackupReader {
 			str = str + String.format("%02X", arr[i]);
 		}
 		
-		logger.trace(str);
+		logger.info(str);
 	}
 }

@@ -4,7 +4,7 @@ module signalbackupreader {
 	exports signalbackupreader.entry;
 
 	requires com.google.protobuf;
-	requires hkdf;
+	requires at.favre.lib.hkdf;
 	requires java.sql;
 	requires org.apache.logging.log4j;
 }

@@ -40,7 +40,7 @@ import org.thoughtcrime.securesms.backup.proto.Backups.Sticker;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 
-import at.favre.lib.crypto.HKDF;
+import at.favre.lib.hkdf.HKDF;
 import signalbackupreader.entry.*;
 
 public class SignalBackupReader {

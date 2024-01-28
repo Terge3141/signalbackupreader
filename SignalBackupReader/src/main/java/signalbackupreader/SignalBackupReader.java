@@ -73,31 +73,16 @@ public class SignalBackupReader {
 	}
 	
 	public IEntry readNextEntry() throws SignalBackupReaderException {
-		logger.info("readNextEntry");
-		
-		dumpByteArray("cypherKey", cypherKey);
-		
-		logger.info("Backupfile version {}", this.backupFileVersion);
-		
-		/*System.out.println("backupFileVersion: " + backupFileVersion);
-		if(true) return null;*/
-		/*if(true) return null;*/
-		
-		//byte[] data = getNextDecryptedBlock();
-		byte[] data;
+		byte[] decrypted;
 		if(backupFileVersion==0) {
-			data = getNextDecryptedBlockLegacy();
+			decrypted = getNextDecryptedBlockLegacy();
 		} else {
-			data = getNextDecryptedBlock();
+			decrypted = getNextDecryptedBlock();
 		}
 		
-		if(data==null) {
+		if(decrypted==null) {
 			return null;
 		}
-		
-		// TODO need for old
-		//byte decrypted[] = decrypt(data, true);
-		byte[] decrypted = data;
 		
 		BackupFrame frame;
 		try {
@@ -234,9 +219,6 @@ public class SignalBackupReader {
 		byte[] encrypted = Arrays.copyOf(data, data.length-10);
 		byte[] theirMac = Arrays.copyOfRange(data, data.length - 10, data.length);
 		
-		//dumpByteArray("IV", this.ivBytes);
-		//dumpByteArray("encrypted", encrypted);
-		
 		byte[] myMac;
 		if(frameMacCheck) {
 			myMac = HKDF.fromHmacSha256().extract(hmacKeys, encrypted);
@@ -275,7 +257,6 @@ public class SignalBackupReader {
 	}
 	
 	private byte[] readLegacyBlock() throws SignalBackupReaderException {
-		// TODO backupversion==0 --> old, see FileDecryptor::getFrame:24
 		try {
 			if (in.available() < HEADER_SIZE) {
 				return null;
@@ -310,17 +291,10 @@ public class SignalBackupReader {
 		
 		SecretKey secretKey = new SecretKeySpec(cypherKey, 0, cypherKey.length, "AES");
 		
-		//incCounter();
-		
-		logger.info("counter: " + counter);
-		
 		int encryptedFrameLength;
 		IvParameterSpec ivSpec = new IvParameterSpec(ivBytes);
 		
 		incCounter();
-		
-		/*HKDF hkdf = HKDF.fromHmacSha256();
-		byte[] hkdf_buf;*/
 		
 		Mac sha256_HMAC;
 		try {
@@ -338,15 +312,10 @@ public class SignalBackupReader {
 			
 			dumpByteArray("encryptedEncryptedFrameLength", encryptedEncryptedFrameLength);
 			
-			//byte[] decrypted = cipher.doFinal(encryptedEncryptedFrameLength);
 			byte[] decrypted = cipher.update(encryptedEncryptedFrameLength);
 			encryptedFrameLength = (int)getUintFromBytes(decrypted);
 			
-			//hkdf_buf = hkdf.extract(hmacKeys, encryptedEncryptedFrameLength);
 			sha256_HMAC.update(encryptedEncryptedFrameLength);
-			
-			dumpByteArray("decrypted", decrypted);
-			logger.info("encryptedFrameLength: " + encryptedFrameLength);
 		} catch (InvalidKeyException | NoSuchAlgorithmException | NoSuchPaddingException
 				| InvalidAlgorithmParameterException e) {
 			throw new SignalBackupReaderException("Cannot decrypt frame length", e);
@@ -357,7 +326,6 @@ public class SignalBackupReader {
 		}
 		
 		byte[] encryptedFrame = new byte[encryptedFrameLength];
-		// TODO check if encryptedFrameLength bytes are read
 		try {
 			in.read(encryptedFrame);
 		} catch (IOException e) {
@@ -369,17 +337,8 @@ public class SignalBackupReader {
 		
 		dumpByteArray("encrypted", encrypted);
 		
-		// TODO check MAC
-		//byte[] myMac = hkdf.extract(hkdf_buf, encrypted);
 		sha256_HMAC.update(encrypted);
-		
 		byte[] myMac = Arrays.copyOfRange(sha256_HMAC.doFinal(), 0, theirMac.length);
-		//byte[] myMac = hkdf.expand(hkdf_buf, encrypted, theirMac.length);
-		//HKDF hkdf = HKDF.fromHmacSha256();
-		/*byte[] myMac = HKDF.fromHmacSha256().extract(hmacKeys, encrypted);
-		myMac = Arrays.copyOf(myMac, theirMac.length);*/
-		
-		
 		
 		if(!Arrays.equals(myMac, theirMac)) {
 			dumpByteArray("theirmac", theirMac);
@@ -396,14 +355,6 @@ public class SignalBackupReader {
 		}
 	}
 	
-	/*
-	 * first frame:
-	 * tool: 0xE6CEA859 --> 0x3C
-	 * here: 0x59A8CEE6 --> same other order
-	 * 
-	 */
-	
-	
 	// http://jhnet.co.uk/articles/signal_backups
 	private void readKeys() throws SignalBackupReaderException {
 		byte data[] = readLegacyBlock();
@@ -418,7 +369,6 @@ public class SignalBackupReader {
 		ByteString ivByteString = header.getIv();
 		ByteString saltByteString = header.getSalt();
 		this.backupFileVersion = header.getVersion();
-		//System.out.println("version: " + backupFrame.getHeader().get);
 		
 		byte salt[] = saltByteString.toByteArray();
 		byte passphraseBytes[] = this.passphrase.getBytes(StandardCharsets.US_ASCII);
@@ -428,7 +378,6 @@ public class SignalBackupReader {
 		
 		dumpByteArray("Salt", salt);
 		dumpByteArray("Hash", hash);
-		logger.info("Counter: " + counter);
 		
 		MessageDigest sha512;
 		try {
@@ -454,9 +403,6 @@ public class SignalBackupReader {
 		byte keys[] = HKDF.fromHmacSha256().expand(res, info, 64);
 		this.cypherKey = Arrays.copyOf(keys, 32);
 		this.hmacKeys = Arrays.copyOfRange(keys, 32, 64);
-		
-		dumpByteArray("Cipherkey: ", cypherKey);
-		dumpByteArray("Mackey", hmacKeys);
 	}
 	
 	private void incCounter() {
@@ -516,6 +462,6 @@ public class SignalBackupReader {
 			str = str + String.format("%02X", arr[i]);
 		}
 		
-		logger.info(str);
+		logger.trace(str);
 	}
 }

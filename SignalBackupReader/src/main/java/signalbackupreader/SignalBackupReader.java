@@ -20,6 +20,7 @@ import java.util.List;
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.Mac;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
@@ -304,6 +305,18 @@ public class SignalBackupReader {
 		
 		incCounter();
 		
+		/*HKDF hkdf = HKDF.fromHmacSha256();
+		byte[] hkdf_buf;*/
+		
+		Mac sha256_HMAC;
+		try {
+			sha256_HMAC = Mac.getInstance("HmacSHA256");
+			SecretKeySpec secret_key = new SecretKeySpec(hmacKeys, "HmacSHA256");
+			sha256_HMAC.init(secret_key);
+		} catch (NoSuchAlgorithmException | InvalidKeyException e) {
+			throw new SignalBackupReaderException("Cannot initialize MAC calculator", e);
+		}
+		
 		Cipher cipher;
 		try {
 			cipher = Cipher.getInstance("AES/CTR/NoPadding");
@@ -314,6 +327,9 @@ public class SignalBackupReader {
 			//byte[] decrypted = cipher.doFinal(encryptedEncryptedFrameLength);
 			byte[] decrypted = cipher.update(encryptedEncryptedFrameLength);
 			encryptedFrameLength = (int)getUintFromBytes(decrypted);
+			
+			//hkdf_buf = hkdf.extract(hmacKeys, encryptedEncryptedFrameLength);
+			sha256_HMAC.update(encryptedEncryptedFrameLength);
 			
 			dumpByteArray("decrypted", decrypted);
 			logger.info("encryptedFrameLength: " + encryptedFrameLength);
@@ -339,14 +355,23 @@ public class SignalBackupReader {
 		
 		dumpByteArray("encrypted", encrypted);
 		
+		// TODO check MAC
+		//byte[] myMac = hkdf.extract(hkdf_buf, encrypted);
+		sha256_HMAC.update(encrypted);
+		
+		byte[] myMac = Arrays.copyOfRange(sha256_HMAC.doFinal(), 0, theirMac.length);
+		//byte[] myMac = hkdf.expand(hkdf_buf, encrypted, theirMac.length);
+		//HKDF hkdf = HKDF.fromHmacSha256();
 		/*byte[] myMac = HKDF.fromHmacSha256().extract(hmacKeys, encrypted);
-		myMac = Arrays.copyOf(myMac, theirMac.length);
+		myMac = Arrays.copyOf(myMac, theirMac.length);*/
+		
+		
 		
 		if(!Arrays.equals(myMac, theirMac)) {
 			dumpByteArray("theirmac", theirMac);
 			dumpByteArray("mymac", myMac);
 			throw new SignalBackupReaderException("mymac and theirmac differ");
-		}*/
+		}
 		
 		try {
 			byte[] decryptedBlock = cipher.doFinal(encrypted);

@@ -7,4 +7,5 @@ module signalbackupreader {
 	requires at.favre.lib.hkdf;
 	requires java.sql;
 	requires org.apache.logging.log4j;
+	requires org.mybatis;
 }

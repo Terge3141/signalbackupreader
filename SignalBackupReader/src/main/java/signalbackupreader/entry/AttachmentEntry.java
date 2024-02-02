@@ -14,7 +14,8 @@ public class AttachmentEntry implements IEntry, IBlobEntry {
 
 	@Override
 	public String getNamePrefix() {
-		return String.format("Attachment_%d", attachmentId);
+		//return String.format("Attachment_%d", attachmentId); --> v0? 
+		return String.format("Attachment_%d", rowId);
 	}
 
 	public long getRowId() {

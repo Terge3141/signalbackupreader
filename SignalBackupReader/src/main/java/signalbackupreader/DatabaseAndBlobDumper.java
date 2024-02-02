@@ -2,6 +2,7 @@ package signalbackupreader;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -11,6 +12,8 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.ibatis.jdbc.RuntimeSqlException;
+import org.apache.ibatis.jdbc.ScriptRunner;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -94,13 +97,30 @@ public class DatabaseAndBlobDumper {
 	
 	private List<String> getSqlViewCmds() throws SignalBackupReaderException {
 		List<String> sqlViewCmds = new ArrayList<String>();
+		int backupVersion = 1;
 		try {
-			sqlViewCmds.add(loadResourceToString("v_00_sms_corrected.sql.txt"));
-			sqlViewCmds.add(loadResourceToString("v_01_mms_corrected.sql.txt"));
-			sqlViewCmds.add(loadResourceToString("v_02_all_names.sql.txt"));
-			sqlViewCmds.add(loadResourceToString("v_03_all_messages.sql.txt"));
-			sqlViewCmds.add(loadResourceToString("v_04_chats.sql.txt"));
-			sqlViewCmds.add(loadResourceToString("v_05_stickers.sql.txt"));
+			if(backupVersion==0) {
+				sqlViewCmds.add(loadResourceToString("v_00_sms_corrected.sql.txt"));
+				sqlViewCmds.add(loadResourceToString("v_01_mms_corrected.sql.txt"));
+				sqlViewCmds.add(loadResourceToString("v_02_all_names.sql.txt"));
+				sqlViewCmds.add(loadResourceToString("v_03_all_messages.sql.txt"));
+				sqlViewCmds.add(loadResourceToString("v_04_chats.sql.txt"));
+				sqlViewCmds.add(loadResourceToString("v_05_stickers.sql.txt"));
+			} else if(backupVersion==1) {
+				sqlViewCmds.add(loadResourceToString("c_00_types.sql"));
+				sqlViewCmds.add(loadResourceToString("c_01_masks_bits.sql"));
+				sqlViewCmds.add(loadResourceToString("c_02_notorig_messagetypes.sql"));
+				sqlViewCmds.add(loadResourceToString("c_03_masks.sql"));
+				sqlViewCmds.add(loadResourceToString("c_04_messages_and_masks.sql"));
+				sqlViewCmds.add(loadResourceToString("c_05_all_names.sql"));
+				sqlViewCmds.add(loadResourceToString("c_06_messages_mediatypes.sql"));
+				sqlViewCmds.add(loadResourceToString("c_07_chats.sql"));
+				sqlViewCmds.add(loadResourceToString("c_08_attachments.sql"));
+				sqlViewCmds.add(loadResourceToString("c_09_stickers.sql"));
+			} else {
+				String msg = String.format("Backup file version %d not supported", backupVersion);
+				throw new SignalBackupReaderException(msg);
+			}
 		} catch (IOException e) {
 			String msg = "Cannot load internal sql resource file";
 			throw new SignalBackupReaderException(msg, e);
@@ -174,9 +194,20 @@ public class DatabaseAndBlobDumper {
 		return sqliteOutputPath;
 	}
 
-	private void executeStatements(Connection connection, List<String> sqlStatements) throws SQLException {
+	private void executeStatements(Connection connection, List<String> sqlStatements) throws SignalBackupReaderException {
+		ScriptRunner scriptRunner = new ScriptRunner(connection);
+		scriptRunner.setSendFullScript(false);
+	    scriptRunner.setStopOnError(true);
+	    scriptRunner.setThrowWarning(true);
+	    scriptRunner.setEscapeProcessing(false);
+	    scriptRunner.setLogWriter(null);
+		
 		for(String sql : sqlStatements) {
-			connection.createStatement().execute(sql);
+			try {
+				scriptRunner.runScript(new StringReader(sql));
+			} catch(RuntimeSqlException e) {
+				throw new SignalBackupReaderException("Cannot invoke sql statements", e);
+			}
 		}
 	}
 

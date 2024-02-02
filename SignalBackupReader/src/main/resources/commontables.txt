@@ -1,0 +1,21 @@
+v_chats
+-------
+msgid
+date
+sender
+chatname
+text
+type = {text, media}
+
+
+v_attachments
+-------------
+attachmentid
+msgid
+content_type
+
+v_stickers
+----------
+fileid
+msgid
+sticker_emoji

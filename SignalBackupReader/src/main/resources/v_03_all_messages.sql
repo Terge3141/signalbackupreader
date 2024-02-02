@@ -1,3 +1,5 @@
+drop view if exists v_all_messages;
+
 create view v_all_messages as
 
 select msgid, thread_id, date, sender, text, type from v_sms_corrected

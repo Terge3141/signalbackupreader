@@ -1,3 +1,5 @@
+drop view if exists v_stickers;
+
 CREATE VIEW v_stickers AS
 
 SELECT s._id file_id, p.mid, p.ct, p.sticker_emoji FROM part p 

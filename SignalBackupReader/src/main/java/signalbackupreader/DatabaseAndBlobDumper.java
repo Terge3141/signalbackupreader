@@ -95,31 +95,30 @@ public class DatabaseAndBlobDumper {
 		}
 	}
 	
-	private List<String> getSqlViewCmds() throws SignalBackupReaderException {
+	private List<String> getSqlViewCmds(int backupFileVersion) throws SignalBackupReaderException {
 		List<String> sqlViewCmds = new ArrayList<String>();
-		int backupVersion = 0;
 		try {
-			if(backupVersion==0) {
-				sqlViewCmds.add(loadResourceToString("v_00_sms_corrected.sql"));
-				sqlViewCmds.add(loadResourceToString("v_01_mms_corrected.sql"));
-				sqlViewCmds.add(loadResourceToString("v_02_all_names.sql"));
-				sqlViewCmds.add(loadResourceToString("v_03_all_messages.sql"));
-				sqlViewCmds.add(loadResourceToString("v_04_chats.sql"));
-				sqlViewCmds.add(loadResourceToString("v_05_stickers.sql"));
-				sqlViewCmds.add(loadResourceToString("v_06_attachments.sql"));
-			} else if(backupVersion==1) {
-				sqlViewCmds.add(loadResourceToString("c_00_types.sql"));
-				sqlViewCmds.add(loadResourceToString("c_01_masks_bits.sql"));
-				sqlViewCmds.add(loadResourceToString("c_02_notorig_messagetypes.sql"));
-				sqlViewCmds.add(loadResourceToString("c_03_masks.sql"));
-				sqlViewCmds.add(loadResourceToString("c_04_messages_and_masks.sql"));
-				sqlViewCmds.add(loadResourceToString("c_05_all_names.sql"));
-				sqlViewCmds.add(loadResourceToString("c_06_messages_mediatypes.sql"));
-				sqlViewCmds.add(loadResourceToString("c_07_chats.sql"));
-				sqlViewCmds.add(loadResourceToString("c_08_attachments.sql"));
-				sqlViewCmds.add(loadResourceToString("c_09_stickers.sql"));
+			if(backupFileVersion==0) {
+				sqlViewCmds.add(loadResourceToString("create_v0_00_sms_corrected.sql"));
+				sqlViewCmds.add(loadResourceToString("create_v0_01_mms_corrected.sql"));
+				sqlViewCmds.add(loadResourceToString("create_v0_02_all_names.sql"));
+				sqlViewCmds.add(loadResourceToString("create_v0_03_all_messages.sql"));
+				sqlViewCmds.add(loadResourceToString("create_v0_04_chats.sql"));
+				sqlViewCmds.add(loadResourceToString("create_v0_05_stickers.sql"));
+				sqlViewCmds.add(loadResourceToString("create_v0_06_attachments.sql"));
+			} else if(backupFileVersion==1) {
+				sqlViewCmds.add(loadResourceToString("create_v1_00_types.sql"));
+				sqlViewCmds.add(loadResourceToString("create_v1_01_masks_bits.sql"));
+				sqlViewCmds.add(loadResourceToString("create_v1_02_notorig_messagetypes.sql"));
+				sqlViewCmds.add(loadResourceToString("create_v1_03_masks.sql"));
+				sqlViewCmds.add(loadResourceToString("create_v1_04_messages_and_masks.sql"));
+				sqlViewCmds.add(loadResourceToString("create_v1_05_all_names.sql"));
+				sqlViewCmds.add(loadResourceToString("create_v1_06_messages_mediatypes.sql"));
+				sqlViewCmds.add(loadResourceToString("create_v1_07_chats.sql"));
+				sqlViewCmds.add(loadResourceToString("create_v1_08_attachments.sql"));
+				sqlViewCmds.add(loadResourceToString("create_v1_09_stickers.sql"));
 			} else {
-				String msg = String.format("Backup file version %d not supported", backupVersion);
+				String msg = String.format("Backup file version %d not supported", backupFileVersion);
 				throw new SignalBackupReaderException(msg);
 			}
 		} catch (IOException e) {
@@ -134,7 +133,7 @@ public class DatabaseAndBlobDumper {
 		logger.info("Start dump");
 		
 		checkAndCreateDirs();
-		List<String> sqlViewCmds = getSqlViewCmds();
+		
 		
 		logger.info("Reading backup file from '{}'", backupFilePath);
 		logger.info("Writing sqlite file to '{}'", sqliteOutputPath);
@@ -143,6 +142,8 @@ public class DatabaseAndBlobDumper {
 		String url = String.format("jdbc:sqlite:%s", sqliteOutputPath);
 		this.connection = DriverManager.getConnection(url);
 		this.connection.setAutoCommit(false);
+		
+		List<String> sqlViewCmds = getSqlViewCmds(signalBackupReader.getBackupFileVersion());
 		
 		IEntry entry;
 		while ((entry = this.signalBackupReader.readNextEntry()) != null) {

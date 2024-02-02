@@ -192,6 +192,10 @@ public class SignalBackupReader {
 		throw new SignalBackupReaderException("Unknown frame type");
 	}
 	
+	public int getBackupFileVersion() {
+		return this.backupFileVersion;
+	}
+	
 	private void setup(Path backupPath, String passphrase) throws SignalBackupReaderException {
 		try {
 			this.in = new BufferedInputStream(new FileInputStream(backupPath.toFile()));

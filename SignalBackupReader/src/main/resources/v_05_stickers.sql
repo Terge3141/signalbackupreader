@@ -1,4 +1,4 @@
-drop view if exists v_stickers;
+DROP VIEW IF EXISTS v_stickers;
 
 CREATE VIEW v_stickers AS
 

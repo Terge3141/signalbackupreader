@@ -1,5 +1,5 @@
-drop view if exists v_attachments;
+DROP VIEW IF EXISTS v_attachments;
 
-create view v_attachments as
+CREATE VIEW v_attachments AS
 
-select unique_id attachmentid, mid msgid, ct content_type from part;
+SELECT unique_id attachmentid, mid msgid, ct content_type FROM part;

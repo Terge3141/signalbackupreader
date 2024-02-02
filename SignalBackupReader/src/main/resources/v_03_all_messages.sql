@@ -1,7 +1,7 @@
-drop view if exists v_all_messages;
+DROP VIEW IF EXISTS v_all_messages;
 
-create view v_all_messages as
+CREATE VIEW v_all_messages AS
 
-select msgid, thread_id, date, sender, text, type from v_sms_corrected
-union
-select msgid, thread_id, date, sender, text, type from v_mms_corrected;
+SELECT msgid, thread_id, date, sender, text, type FROM v_sms_corrected
+UNION
+SELECT msgid, thread_id, date, sender, text, type FROM v_mms_corrected;

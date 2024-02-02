@@ -1,11 +1,11 @@
-drop view if exists v_mms_corrected;
+DROP VIEW IF EXISTS v_mms_corrected;
 
-create view v_mms_corrected as
+CREATE VIEW v_mms_corrected AS
 
 /* Messages sent by me have the receiver as address. In this case set the address to -1 */
-select _id 'msgid', thread_id, date, -1 'sender', body 'text', 'media' 'type'
-	from mms where date_server = -1
+SELECT _id 'msgid', thread_id, date, -1 'sender', body 'text', 'media' 'type'
+	FROM mms WHERE date_server = -1
 /* add all messages sent by others */
-union
-select _id 'msgid', thread_id, date, address 'sender', body 'text', 'media' 'type'
-	from mms where date_server != -1;
+UNION
+SELECT _id 'msgid', thread_id, date, address 'sender', body 'text', 'media' 'type'
+	FROM mms WHERE date_server != -1;

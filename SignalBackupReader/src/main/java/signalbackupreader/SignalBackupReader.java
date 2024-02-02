@@ -162,7 +162,7 @@ public class SignalBackupReader {
 			
 			if(frame.hasAttachment()) {
 				Attachment a = frame.getAttachment();
-				return new AttachmentEntry(a.getRowId(), a.getAttachmentId(), decBlob);
+				return new AttachmentEntry(a.getRowId(), a.getAttachmentId(), decBlob, this.backupFileVersion);
 			}
 			else if(frame.hasSticker()) {
 				Sticker s = frame.getSticker();

@@ -5,16 +5,21 @@ public class AttachmentEntry implements IEntry, IBlobEntry {
 	private long rowId;
 	private long attachmentId;
 	private byte[] blob;
+	private int backupFileVersion;
 	
-	public AttachmentEntry(long rowId, long attachmentId, byte[] blob) {
+	public AttachmentEntry(long rowId, long attachmentId, byte[] blob, int backupFileVersion) {
 		this.rowId = rowId;
 		this.attachmentId = attachmentId;
 		this.blob = blob;
+		this.backupFileVersion = backupFileVersion;
 	}
 
 	@Override
 	public String getNamePrefix() {
-		//return String.format("Attachment_%d", attachmentId); --> v0? 
+		if(backupFileVersion==0) {
+			return String.format("Attachment_%d", attachmentId);
+		}
+		
 		return String.format("Attachment_%d", rowId);
 	}
 

@@ -97,15 +97,16 @@ public class DatabaseAndBlobDumper {
 	
 	private List<String> getSqlViewCmds() throws SignalBackupReaderException {
 		List<String> sqlViewCmds = new ArrayList<String>();
-		int backupVersion = 1;
+		int backupVersion = 0;
 		try {
 			if(backupVersion==0) {
-				sqlViewCmds.add(loadResourceToString("v_00_sms_corrected.sql.txt"));
-				sqlViewCmds.add(loadResourceToString("v_01_mms_corrected.sql.txt"));
-				sqlViewCmds.add(loadResourceToString("v_02_all_names.sql.txt"));
-				sqlViewCmds.add(loadResourceToString("v_03_all_messages.sql.txt"));
-				sqlViewCmds.add(loadResourceToString("v_04_chats.sql.txt"));
-				sqlViewCmds.add(loadResourceToString("v_05_stickers.sql.txt"));
+				sqlViewCmds.add(loadResourceToString("v_00_sms_corrected.sql"));
+				sqlViewCmds.add(loadResourceToString("v_01_mms_corrected.sql"));
+				sqlViewCmds.add(loadResourceToString("v_02_all_names.sql"));
+				sqlViewCmds.add(loadResourceToString("v_03_all_messages.sql"));
+				sqlViewCmds.add(loadResourceToString("v_04_chats.sql"));
+				sqlViewCmds.add(loadResourceToString("v_05_stickers.sql"));
+				sqlViewCmds.add(loadResourceToString("v_06_attachments.sql"));
 			} else if(backupVersion==1) {
 				sqlViewCmds.add(loadResourceToString("c_00_types.sql"));
 				sqlViewCmds.add(loadResourceToString("c_01_masks_bits.sql"));
